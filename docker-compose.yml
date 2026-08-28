@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+
+  backend:
+    build:
+      context: ./backend
+    container_name: legal_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Points to the Qdrant container on the internal Docker network
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - qdrant
+    volumes:
+      # Mounts local code so you don't have to rebuild the image on every change
+      - ./backend:/app
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: legal_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # Points to the FastAPI container
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
