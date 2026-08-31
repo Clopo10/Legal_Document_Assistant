@@ -14,6 +14,7 @@ from qdrant_client import QdrantClient
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from app.schemas import ContractAnalysisResponse
+from qdrant_client.http import models
 
 load_dotenv()
 
@@ -30,15 +31,35 @@ def get_llm():
         max_retries=3
     )
 
-def analyze_contract_compliance(full_contract_text: str, playbook_rule: str) -> ContractAnalysisResponse:
+def analyze_contract_compliance(filename: str, full_contract_text: str, playbook_rule: str) -> ContractAnalysisResponse:
     start_time = time.time()
     
     # Connect to Qdrant
     client = QdrantClient(url=QDRANT_URL)
     qdrant = QdrantVectorStore(client=client, collection_name=COLLECTION_NAME, embedding=embeddings)
+
+    # Account for how Windows vs Mac/Linux saves file paths in LangChain
+    possible_sources = [
+        filename,                                  # e.g., "contract_1.txt"
+        f"data/sample_contracts/{filename}",       # Mac/Linux path
+        f"data\\sample_contracts\\{filename}",     # Windows path
+        f"../data/sample_contracts/{filename}"     # Relative path
+    ]
     
-    # Retrieve top chunks relevant to the rule
-    retriever = qdrant.as_retriever(search_kwargs={"k": 4})
+    # Retrieve top chunks ONLY from the selected contract
+    retriever = qdrant.as_retriever(
+        search_kwargs={
+            "k": 4,
+            "filter": models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="metadata.source",
+                        match=models.MatchAny(any=possible_sources) # Filters by the selected file!
+                    )
+                ]
+            )
+        }
+    )
     retrieved_docs = retriever.invoke(playbook_rule)
     context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 

@@ -15,6 +15,7 @@ app = FastAPI(
 )
 
 class AnalysisRequest(BaseModel):
+    filename: str
     contract_text: str
     playbook_rule: str
 
@@ -26,6 +27,7 @@ def health_check():
 def analyze(request: AnalysisRequest):
     try:
         response = analyze_contract_compliance(
+            filename=request.filename,
             full_contract_text=request.contract_text,
             playbook_rule=request.playbook_rule
         )
