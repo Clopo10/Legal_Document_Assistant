@@ -31,7 +31,7 @@ def get_llm():
         max_retries=3
     )
 
-def analyze_contract_compliance(filename: str, full_contract_text: str, playbook_rule: str) -> ContractAnalysisResponse:
+def analyze_contract_compliance(filename: str, full_contract_text: str, playbook_rule: str, model_name: str = "gemini-3.6-flash") -> ContractAnalysisResponse:
     start_time = time.time()
     
     # Connect to Qdrant
@@ -67,7 +67,11 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
     context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 
     # Setup Gemini with Structured Output
-    llm = get_llm()
+    llm = ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
     structured_llm = llm.with_structured_output(ContractAnalysisResponse)
 
     prompt_template = PromptTemplate(
@@ -91,17 +95,27 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
 
     prompt = prompt_template.format(rule=playbook_rule, context=context_text)
     
-    # Invoke the model
-    result: ContractAnalysisResponse = structured_llm.invoke(prompt)
+    # Invoke the model (Gemini only handles the legal stuff)
+    result_pydantic: ContractAnalysisResponse = structured_llm.invoke(prompt)
     
-    # Calculate Latency and Estimated Costs
+    # Convert the Pydantic object to a standard Python dictionary
+    final_response = result_pydantic.model_dump()
+    
+    # Calculate Latency
     latency = round(time.time() - start_time, 3)
-    result.latency_seconds = latency
+    final_response["latency_seconds"] = latency
     
     # Rough token estimation for logging (1 token ≈ 4 chars)
     est_input_tokens = len(prompt) // 4
-    # Gemini Flash pricing: ~$0.075 per 1M input tokens
-    result.input_tokens = est_input_tokens
-    result.estimated_cost_usd = round((est_input_tokens / 1_000_000) * 0.075, 6)
+    final_response["input_tokens"] = est_input_tokens
+    
+    # Dynamic Pricing Calculator
+    if "3.8" in model_name.lower():
+        price_per_million = 0.15  # 3.8 Flash pricing
+    else:
+        price_per_million = 0.075 # 3.6 Flash pricing
+        
+    final_response["estimated_cost_usd"] = round((est_input_tokens / 1_000_000) * price_per_million, 6)
 
-    return result
+    # Return the dictionary to FastAPI (FastAPI automatically converts dicts to JSON)
+    return final_response

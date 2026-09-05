@@ -36,6 +36,26 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/analyze")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "data", "sample_contracts"))
 
+# ==============================================================================
+# SIDEBAR
+# ==============================================================================
+with st.sidebar:
+    st.title("Settings")
+    
+    st.subheader("AI Engine")
+    selected_model = st.selectbox(
+        "Model Tier",
+        options=["gemini-3.6-flash", "gemini-3.8-flash"]
+    )
+    
+    st.divider()
+    
+    # Create an empty placeholder. We will inject the metrics here at the very end of the script!
+    usage_placeholder = st.empty()
+    
+    st.divider()
+    st.caption("Legal Assistant Capstone v2.0")
+
 
 def get_contract_files():
     if not os.path.exists(DATA_DIR):
@@ -129,7 +149,8 @@ with tab_demo:
                             payload = {
                                 "filename": selected_file,
                                 "contract_text": raw_text,
-                                "playbook_rule": playbook_rule
+                                "playbook_rule": playbook_rule,
+                                "model": selected_model
                             }
                             response = requests.post(BACKEND_URL, json=payload, timeout=60)
                             response.raise_for_status()
@@ -220,22 +241,9 @@ with tab_history:
 
 
 # ==============================================================================
-# SIDEBAR
+# INJECT SIDEBAR METRICS
 # ==============================================================================
-with st.sidebar:
-    st.title("Settings")
-    
-    st.subheader("AI Engine")
-    selected_model = st.selectbox(
-        "Model Tier",
-        options=["gemini-3.6-flash", "gemini-1.5-pro"]
-    )
-    
-    st.divider()
-    
+with usage_placeholder.container():
     st.subheader("Session Usage")
     st.metric(label="Tokens Processed", value=f"{st.session_state.total_tokens:,}")
     st.metric(label="Est. Enterprise Cost", value=f"${st.session_state.total_cost:.5f}")
-    
-    st.divider()
-    st.caption("Legal Assistant Capstone v2.0")
