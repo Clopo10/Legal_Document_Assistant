@@ -48,19 +48,22 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
     
     # Retrieve top chunks ONLY from the selected contract
     retriever = qdrant.as_retriever(
+        search_type="similarity_score_threshold",
         search_kwargs={
-            "k": 4,
+            "score_threshold": 0.65,
+            "k": 20,
             "filter": models.Filter(
                 must=[
                     models.FieldCondition(
                         key="metadata.source",
-                        match=models.MatchAny(any=possible_sources) # Filters by the selected file!
+                        match=models.MatchAny(any=possible_sources) # Filters by the selected file
                     )
                 ]
             )
         }
     )
     retrieved_docs = retriever.invoke(playbook_rule)
+    print(f"DEBUG: Qdrant returned {len(retrieved_docs)} chunks passing the threshold.")
     context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 
     # Setup Gemini with Structured Output
