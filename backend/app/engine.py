@@ -119,3 +119,44 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
 
     # Return the dictionary to FastAPI (FastAPI automatically converts dicts to JSON)
     return final_response
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+import pypdf
+
+def process_and_vectorize_file(file_path: str, filename: str) -> str:
+    """Extracts text from a file, chunks it, and saves it to Qdrant."""
+    
+    # Extract Text based on file type
+    text = ""
+    if filename.lower().endswith(".pdf"):
+        reader = pypdf.PdfReader(file_path)
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
+    else:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+            
+    if not text.strip():
+        raise ValueError("Could not extract text. The PDF might be an image/scan.")
+
+    # Split into semantic chunks
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        separators=["\n\n", "\n", ".", " ", ""]
+    )
+    chunks = text_splitter.split_text(text)
+    
+    # Attach metadata (so Qdrant knows which file this chunk belongs to)
+    docs = [Document(page_content=chunk, metadata={"source": filename}) for chunk in chunks]
+    
+    # Connect to Qdrant and upload
+    client = QdrantClient(url=QDRANT_URL) 
+    qdrant = QdrantVectorStore(client=client, collection_name=COLLECTION_NAME, embedding=embeddings)
+    
+    qdrant.add_documents(docs)
+    
+    return text # Return the raw text so the Streamlit viewer can display it

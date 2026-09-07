@@ -5,6 +5,7 @@ Streamlit Frontend: Legal Document Assistant
 import os
 import requests
 import streamlit as st
+import re
 
 # Page Configuration
 st.set_page_config(
@@ -73,22 +74,38 @@ def load_contract_text(filename):
 
 def highlight_text(full_text, flagged_clauses):
     highlighted = full_text
+    
     for clause in flagged_clauses:
         snippet = clause.get("original_text", "")
+        if not snippet:
+            continue
+            
         risk = clause.get("risk_level", "HIGH")
-        
         bg_color = "#fee2e2" if risk == "HIGH" else "#fef9c3"
         text_color = "#991b1b" if risk == "HIGH" else "#854d0e"
         border = "1px solid #f87171" if risk == "HIGH" else "1px solid #facc15"
+        reason_escaped = clause.get("reason", "").replace('"', '&quot;')
         
-        if snippet and snippet in highlighted:
-            reason_escaped = clause.get("reason", "").replace('"', '&quot;')
-            html_tag = (
-                f'<mark style="background-color: {bg_color}; color: {text_color}; '
-                f'border: {border}; font-weight: bold; padding: 2px 4px; '
-                f'border-radius: 4px;" title="{reason_escaped}">{snippet}</mark>'
-            )
+        # Clean the AI's string and escape special regex characters
+        pattern = re.escape(snippet.strip())
+        
+        # Make the search flexible: treat any space or newline as "one or more whitespaces"
+        pattern = pattern.replace(r'\ ', r'\s+').replace(r'\n', r'\s+')
+        
+        # \g<0> tells regex to insert the EXACT text it found in the document, preserving original formatting
+        html_tag = (
+            f'<mark style="background-color: {bg_color}; color: {text_color}; '
+            f'border: {border}; font-weight: bold; padding: 2px 4px; '
+            f'border-radius: 4px;" title="{reason_escaped}">\g<0></mark>'
+        )
+        
+        try:
+            # Search and replace flexibly, ignoring case sensitivity
+            highlighted = re.sub(pattern, html_tag, highlighted, flags=re.IGNORECASE)
+        except Exception:
+            # If regex fails for some weird edge case, fallback to exact string matching
             highlighted = highlighted.replace(snippet, html_tag)
+
     return highlighted
 
 
@@ -224,12 +241,163 @@ with tab_demo:
 # TAB 2: CUSTOM WORKSPACE
 # ------------------------------------------------------------------------------
 with tab_upload:
-    st.subheader("Upload a New Contract")
-    st.write("Upload a .txt or .pdf contract. The backend will parse, chunk, and vectorize the document on the fly.")
+    # State Management for the Custom Workspace
+    if "custom_file_name" not in st.session_state:
+        st.session_state.custom_file_name = None
+    if "custom_raw_text" not in st.session_state:
+        st.session_state.custom_raw_text = None
+    if "custom_analysis" not in st.session_state:
+        st.session_state.custom_analysis = None
+
+    col1, col2 = st.columns([6, 4])
     
-    uploaded_file = st.file_uploader("Choose a file to analyze", type=["txt", "pdf"])
-    if uploaded_file:
-        st.info(f"File uploaded: {uploaded_file.name}. Vectorization endpoint coming next.")
+    # ---------------- RIGHT COLUMN: RULES & EXPORT ----------------
+    with col2:
+        st.subheader("Custom Analysis")
+        with st.container(height=640):
+            # Only show settings if a file is uploaded
+            if not st.session_state.custom_raw_text:
+                st.info("Upload a document on the left to unlock analysis settings.")
+            else:
+                playbook_rule = st.text_area(
+                    "Legal Playbook Rule:",
+                    value="The governing law must be the State of Delaware.",
+                    key="custom_rule",
+                    height=90
+                )
+                
+                analyze_btn = st.button("Analyze Custom Document", type="primary", use_container_width=True)
+                
+                if analyze_btn:
+                    with st.spinner("Analyzing against legal playbook..."):
+                        try:
+                            payload = {
+                                "filename": st.session_state.custom_file_name,
+                                "contract_text": st.session_state.custom_raw_text,
+                                "playbook_rule": playbook_rule,
+                                "model": selected_model
+                            }
+                            response = requests.post(BACKEND_URL, json=payload, timeout=60)
+                            response.raise_for_status()
+                            data = response.json()
+                            st.session_state.custom_analysis = data
+                            
+                            st.session_state.total_tokens += data.get("input_tokens", 0) or 0
+                            st.session_state.total_cost += data.get("estimated_cost_usd", 0.0) or 0.0
+                        except Exception as e:
+                            st.error(f"Analysis failed: {e}")
+                
+                # Render Results
+                result = st.session_state.custom_analysis
+                if result:
+                    st.divider()
+                    if result.get("is_compliant"):
+                        st.success("Contract is fully compliant with the playbook.")
+                    else:
+                        st.error("Non-Compliant Clauses Detected")
+                        
+                    st.info(f"**Summary:** {result.get('summary')}")
+                    
+                    flagged = result.get("flagged_clauses", [])
+                    for clause in flagged:
+                        with st.expander(f"{clause.get('clause_title', 'Flagged Clause')}", expanded=True):
+                            st.markdown(f"**Risk Level:** `{clause.get('risk_level', 'HIGH')}`")
+                            st.markdown(f"**Reason:** {clause.get('reason', 'N/A')}")
+                            st.markdown(f"**Proposed Redline:**\n{clause.get('proposed_redline', 'N/A')}")
+
+                    # --- EXPORT TO AUDIT REPORT ---
+                    st.divider()
+                    report_text = f"LEGAL COMPLIANCE AUDIT\nDocument: {st.session_state.custom_file_name}\nModel Used: {selected_model}\n"
+                    report_text += f"{'='*50}\n\nOVERALL SUMMARY:\n{result.get('summary')}\n\n{'='*50}\n\n"
+                    
+                    if not flagged:
+                        report_text += "RESULT: Contract is fully compliant.\n"
+                    else:
+                        report_text += f"VIOLATIONS FOUND ({len(flagged)}):\n\n"
+                        for c in flagged:
+                            report_text += f"CLAUSE: {c.get('clause_title')}\nRISK: {c.get('risk_level')}\n"
+                            report_text += f"ISSUE: {c.get('reason')}\nREDLINE: {c.get('proposed_redline')}\n"
+                            report_text += "-"*30 + "\n"
+                            
+                    st.download_button(
+                        label="Download Audit Report (.txt)",
+                        data=report_text,
+                        file_name=f"Audit_Report_{st.session_state.custom_file_name}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+
+    # ---------------- LEFT COLUMN: UPLOADER OR VIEWER ----------------
+    with col1:
+        st.subheader("Document Workspace")
+        
+        with st.container(height=640):
+            # STATE 1: Empty - Show Drag and Drop
+            if not st.session_state.custom_raw_text:
+                st.write("Upload a `.txt` or text-based `.pdf` contract. The backend will instantly extract, chunk, and vectorize it.")
+                uploaded_file = st.file_uploader("Drop contract here", type=["txt", "pdf"])
+                
+                if uploaded_file:
+                    with st.spinner(f"Extracting and Vectorizing `{uploaded_file.name}`..."):
+                        try:
+                            # Send file to new FastAPI upload route
+                            upload_url = BACKEND_URL.replace("/analyze", "/upload")
+                            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                            res = requests.post(upload_url, files=files)
+                            res.raise_for_status()
+                            
+                            upload_data = res.json()
+                            # Transition to State 2
+                            st.session_state.custom_file_name = upload_data["filename"]
+                            st.session_state.custom_raw_text = upload_data["text"]
+                            st.session_state.custom_analysis = None
+                            st.rerun() # Force UI to update immediately
+                        except Exception as e:
+                            st.error(f"Upload failed: {e}")
+                            
+            # STATE 2: Uploaded - Show Document Viewer
+            else:
+                top_col1, top_col2 = st.columns([7, 3])
+                with top_col1:
+                    st.success(f"Active: `{st.session_state.custom_file_name}`")
+                with top_col2:
+                    if st.button("Clear Workspace", use_container_width=True):
+                        st.session_state.custom_file_name = None
+                        st.session_state.custom_raw_text = None
+                        st.session_state.custom_analysis = None
+                        st.rerun() # Go back to State 1
+                
+                st.divider()
+                
+                # Apply HTML Highlighting
+                display_text = st.session_state.custom_raw_text
+                if st.session_state.custom_analysis:
+                    display_text = highlight_text(
+                        display_text, 
+                        st.session_state.custom_analysis.get("flagged_clauses", [])
+                    )
+                
+                display_text_html = display_text.replace("\n", "<br>")
+                
+                st.markdown(
+                    f"""
+                    <div style="
+                        background-color: #ffffff; 
+                        color: #1f2937; 
+                        padding: 24px; 
+                        border-radius: 6px; 
+                        border: 1px solid #d1d5db; 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                        font-size: 13.5px; 
+                        line-height: 1.7;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                    ">
+                        {display_text_html}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
 
 # ------------------------------------------------------------------------------
 # TAB 3: COMPLIANCE HISTORY
