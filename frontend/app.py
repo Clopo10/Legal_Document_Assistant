@@ -362,6 +362,13 @@ with tab_upload:
                     st.success(f"Active: `{st.session_state.custom_file_name}`")
                 with top_col2:
                     if st.button("Clear Workspace", use_container_width=True):
+                        try:
+                            cleanup_url = BACKEND_URL.replace("/analyze", "/cleanup")
+                            payload = {"filename": st.session_state.custom_file_name}
+                            requests.post(cleanup_url, json=payload, timeout=10)
+                        except Exception as e:
+                            st.warning(f"Frontend cleared, but backend cleanup failed: {e}")
+
                         st.session_state.custom_file_name = None
                         st.session_state.custom_raw_text = None
                         st.session_state.custom_analysis = None

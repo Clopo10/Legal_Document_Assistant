@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.engine import analyze_contract_compliance, process_and_vectorize_file
+from app.engine import analyze_contract_compliance, process_and_vectorize_file, delete_custom_document
 from app.schemas import ContractAnalysisResponse
 
 app = FastAPI(
@@ -74,5 +74,19 @@ async def upload_document(file: UploadFile = File(...)):
     except Exception as e:
         error_msg = traceback.format_exc()
         print("\n=== UPLOAD CRASH ===")
+        print(error_msg)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+class CleanupRequest(BaseModel):
+    filename: str
+
+@app.post("/cleanup")
+def cleanup_document(request: CleanupRequest):
+    try:
+        delete_custom_document(request.filename)
+        return {"message": f"Successfully deleted vectors for {request.filename}"}
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        print("\n=== CLEANUP CRASH ===")
         print(error_msg)
         return JSONResponse(status_code=500, content={"detail": str(e)})

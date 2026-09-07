@@ -154,9 +154,31 @@ def process_and_vectorize_file(file_path: str, filename: str) -> str:
     docs = [Document(page_content=chunk, metadata={"source": filename}) for chunk in chunks]
     
     # Connect to Qdrant and upload
-    client = QdrantClient(url=QDRANT_URL) 
-    qdrant = QdrantVectorStore(client=client, collection_name=COLLECTION_NAME, embedding=embeddings)
-    
-    qdrant.add_documents(docs)
+    QdrantVectorStore.from_documents(
+        docs,
+        embeddings,
+        url=QDRANT_URL,
+        collection_name=COLLECTION_NAME
+    )
     
     return text # Return the raw text so the Streamlit viewer can display it
+
+def delete_custom_document(filename: str):
+    """Deletes all vectorized chunks of a specific document from Qdrant."""
+    client = QdrantClient(url=QDRANT_URL) 
+    
+    # Execute a delete-by-filter operation
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="metadata.source",
+                        match=models.MatchValue(value=filename)
+                    )
+                ]
+            )
+        )
+    )
+    print(f"SUCCESS: Wiped all vectors for {filename} from Qdrant.")
