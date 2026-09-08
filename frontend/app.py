@@ -118,7 +118,7 @@ st.title("Interactive Legal Document Assistant")
 tab_demo, tab_upload, tab_history = st.tabs([
     "Demo Gallery", 
     "Custom Workspace", 
-    "Compliance History"
+    "History"
 ])
 
 # ------------------------------------------------------------------------------
@@ -407,12 +407,99 @@ with tab_upload:
 
 
 # ------------------------------------------------------------------------------
-# TAB 3: COMPLIANCE HISTORY
+# TAB 3: HISTORY DASHBOARD
 # ------------------------------------------------------------------------------
 with tab_history:
-    st.subheader("Compliance History Logs")
-    st.write("Audit trail of historical contract analyses stored in the SQLite backend.")
-    st.info("Database persistence integration coming next.")
+    def delete_record_callback(record_id):
+        try:
+            delete_url = BACKEND_URL.replace("/analyze", f"/history/{record_id}")
+            requests.delete(delete_url, timeout=5)
+        except Exception as e:
+            st.toast(f"Failed to delete record: {e}")
+
+    st.subheader("Analysis Audit Trail")
+    
+    # Fetch data from the FastAPI backend
+    history_data = []
+    try:
+        history_url = BACKEND_URL.replace("/analyze", "/history")
+        res = requests.get(history_url, timeout=10)
+        res.raise_for_status()
+        history_data = res.json().get("history", [])
+    except Exception as e:
+        st.error(f"Could not connect to history database: {e}")
+
+    # Render KPIs
+    if not history_data:
+        st.info("No analysis history found. Run an analysis in the Demo or Custom workspace to see it here.")
+    else:
+        total_runs = len(history_data)
+        total_spend = sum(item.get("estimated_cost_usd", 0.0) for item in history_data)
+        
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric(label="Total Documents Analyzed", value=total_runs)
+        kpi2.metric(label="Total API Spend", value=f"${total_spend:.6f}")
+        kpi3.metric(label="Data Privacy Status", value="Secured locally")
+        
+        st.divider()
+
+        # Render the Master-Detail List
+        for record in history_data:
+            status_badge = "Compliant" if record["is_compliant"] else "Issues Found"
+            
+            # Truncate the rule for the header if it's too long
+            rule_preview = record['playbook_rule']
+            if len(rule_preview) > 60:
+                rule_preview = rule_preview[:60] + "..."
+                
+            header_title = f"{status_badge} | {record['timestamp']} | {record['filename']} | Rule: {rule_preview}"
+            
+            with st.expander(header_title):
+                st.markdown(f"**Model:** `{record['model_used']}` | **Cost for this run:** `${record.get('estimated_cost_usd', 0.0):.6f}`")
+                st.info(f"**Summary:** {record['summary']}")
+                
+                # Show flagged clauses if any
+                flagged = record.get("flagged_clauses", [])
+                if flagged:
+                    for clause in flagged:
+                        st.error(f"**{clause.get('clause_title', 'Flagged Clause')}**\n\n**Risk:** `{clause.get('risk_level')}`\n\n**Issue:** {clause.get('reason')}\n\n**Redline:**\n{clause.get('proposed_redline')}")
+                
+                st.divider()
+                
+                # Action Buttons (Download & Delete)
+                action_col1, action_col2, action_col3 = st.columns([3, 3, 4])
+                
+                with action_col1:
+                    # Generate the PDF/Text report dynamically for historical records
+                    report_text = f"LEGAL COMPLIANCE AUDIT\nDate: {record['timestamp']}\nDocument: {record['filename']}\nModel: {record['model_used']}\n"
+                    report_text += f"{'='*50}\n\nOVERALL SUMMARY:\n{record['summary']}\n\n{'='*50}\n\n"
+                    
+                    if not flagged:
+                        report_text += "RESULT: Contract is fully compliant.\n"
+                    else:
+                        report_text += f"VIOLATIONS FOUND ({len(flagged)}):\n\n"
+                        for c in flagged:
+                            report_text += f"CLAUSE: {c.get('clause_title')}\nRISK: {c.get('risk_level')}\n"
+                            report_text += f"ISSUE: {c.get('reason')}\nREDLINE: {c.get('proposed_redline')}\n"
+                            report_text += "-"*30 + "\n"
+                            
+                    st.download_button(
+                        label="Download Report",
+                        data=report_text,
+                        file_name=f"Audit_{record['filename']}_{record['timestamp'].replace(':', '-')}.txt",
+                        mime="text/plain",
+                        key=f"dl_{record['id']}",
+                        use_container_width=True
+                    )
+                    
+                with action_col2:
+                    st.button(
+                        "Delete Record", 
+                        key=f"del_{record['id']}", 
+                        on_click=delete_record_callback,
+                        args=(record['id'],),
+                        use_container_width=True
+                    )
 
 
 # ==============================================================================

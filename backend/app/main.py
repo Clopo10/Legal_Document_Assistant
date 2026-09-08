@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from app.engine import analyze_contract_compliance, process_and_vectorize_file, delete_custom_document
+from app.database import save_analysis, get_all_history, delete_history_record
 from app.schemas import ContractAnalysisResponse
 
 app = FastAPI(
@@ -36,6 +37,14 @@ def analyze(request: AnalysisRequest):
             playbook_rule=request.playbook_rule,
             model_name=request.model
         )
+
+        save_analysis(
+            filename=request.filename,
+            playbook_rule=request.playbook_rule,
+            result_dict=response,
+            model_used=request.model
+        )
+
         return response
     except Exception as e:
         # Intercept the crash and force it to print to the terminal
@@ -89,4 +98,20 @@ def cleanup_document(request: CleanupRequest):
         error_msg = traceback.format_exc()
         print("\n=== CLEANUP CRASH ===")
         print(error_msg)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.get("/history")
+def fetch_history():
+    try:
+        data = get_all_history()
+        return {"history": data}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.delete("/history/{record_id}")
+def delete_history(record_id: int):
+    try:
+        delete_history_record(record_id)
+        return {"message": "Record deleted successfully."}
+    except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
