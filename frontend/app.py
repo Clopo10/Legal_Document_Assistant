@@ -33,6 +33,8 @@ if "total_tokens" not in st.session_state:
     st.session_state.total_tokens = 0
 if "total_cost" not in st.session_state:
     st.session_state.total_cost = 0.0
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 # 3. Environment & Directory Setup
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/analyze")
@@ -313,45 +315,82 @@ with tab_upload:
                 
                 analysis_mode = st.radio(
                     "Analysis Mode:", 
-                    ["Compliance Check", "General Abstraction"], 
+                    ["Compliance Check", "General Abstraction", "Q&A Chat"], 
                     horizontal=True,
                     on_change=reset_analysis_state
                 )
-                
-                if analysis_mode == "Compliance Check":
-                    playbook_rule = st.text_area(
-                        "Legal Playbook Rule:",
-                        value="The governing law must be the State of Delaware.",
-                        key="custom_rule",
-                        height=90
-                    )
-                    mode_param = "compliance"
+
+                if analysis_mode != "Q&A Chat":
+                    if analysis_mode == "Compliance Check":
+                        playbook_rule = st.text_area(
+                            "Legal Playbook Rule:",
+                            value="The governing law must be the State of Delaware.",
+                            key="custom_rule",
+                            height=90
+                        )
+                        mode_param = "compliance"
+                    else:
+                        st.info("The AI will extract core rights, obligations, financials, and termination terms without a specific rule.")
+                        playbook_rule = "General Contract Abstraction"
+                        mode_param = "abstraction"
+                    
+                    analyze_btn = st.button("Analyze Document", type="primary", use_container_width=True)
+                    
+                    if analyze_btn:
+                        with st.spinner("Analyzing document..."):
+                            try:
+                                payload = {
+                                    "filename": st.session_state.custom_file_name,
+                                    "contract_text": st.session_state.custom_raw_text,
+                                    "playbook_rule": playbook_rule,
+                                    "model": selected_model,
+                                    "mode": mode_param
+                                }
+                                response = requests.post(BACKEND_URL, json=payload, timeout=180)
+                                response.raise_for_status()
+                                data = response.json()
+                                st.session_state.custom_analysis = data
+                                
+                                st.session_state.total_tokens += data.get("input_tokens", 0) or 0
+                                st.session_state.total_cost += data.get("estimated_cost_usd", 0.0) or 0.0
+                            except Exception as e:
+                                st.error(f"Analysis failed: {e}")
+
                 else:
-                    st.info("The AI will extract core rights, obligations, financials, and termination terms without a specific rule.")
-                    playbook_rule = "General Contract Abstraction"
-                    mode_param = "abstraction"
-                
-                analyze_btn = st.button("Analyze Document", type="primary", use_container_width=True)
-                
-                if analyze_btn:
-                    with st.spinner("Analyzing document..."):
-                        try:
-                            payload = {
-                                "filename": st.session_state.custom_file_name,
-                                "contract_text": st.session_state.custom_raw_text,
-                                "playbook_rule": playbook_rule,
-                                "model": selected_model,
-                                "mode": mode_param
-                            }
-                            response = requests.post(BACKEND_URL, json=payload, timeout=180)
-                            response.raise_for_status()
-                            data = response.json()
-                            st.session_state.custom_analysis = data
+                    st.info("Ask open-ended questions about your contract. The AI will retrieve the answers directly from the text.")
+                    
+                    # Display existing chat history
+                    for msg in st.session_state.chat_history:
+                        with st.chat_message(msg["role"]):
+                            st.markdown(msg["content"])
+                    
+                    # Chat Input Box
+                    if prompt := st.chat_input("E.g., What are the payment terms in this contract?"):
+                        # Append user message to UI
+                        st.session_state.chat_history.append({"role": "user", "content": prompt})
+                        with st.chat_message("user"):
+                            st.markdown(prompt)
                             
-                            st.session_state.total_tokens += data.get("input_tokens", 0) or 0
-                            st.session_state.total_cost += data.get("estimated_cost_usd", 0.0) or 0.0
-                        except Exception as e:
-                            st.error(f"Analysis failed: {e}")
+                        # Fetch AI response
+                        with st.chat_message("assistant"):
+                            with st.spinner("Searching document..."):
+                                try:
+                                    chat_url = BACKEND_URL.replace("/analyze", "/chat")
+                                    payload = {
+                                        "filename": st.session_state.custom_file_name,
+                                        "query": prompt,
+                                        "model": selected_model
+                                    }
+                                    res = requests.post(chat_url, json=payload, timeout=60)
+                                    res.raise_for_status()
+                                    
+                                    answer = res.json().get("answer", "No answer received.")
+                                    st.markdown(answer)
+                                    
+                                    # Save to memory
+                                    st.session_state.chat_history.append({"role": "assistant", "content": answer})
+                                except Exception as e:
+                                    st.error(f"Chat failed: {e}")
                 
                 # Render Results
                 result = st.session_state.custom_analysis
@@ -445,6 +484,7 @@ with tab_upload:
                         st.session_state.custom_file_name = None
                         st.session_state.custom_raw_text = None
                         st.session_state.custom_analysis = None
+                        st.session_state.chat_history = []
                         st.rerun() # Go back to State 1
                 
                 st.divider()

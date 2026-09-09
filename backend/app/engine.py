@@ -205,3 +205,48 @@ def delete_custom_document(filename: str):
         )
     )
     print(f"SUCCESS: Wiped all vectors for {filename} from Qdrant.")
+
+
+def chat_with_document(filename: str, query: str, model_name: str):
+    """Retrieves context from Qdrant and answers a user's question about the contract."""
+    
+    # Connect to Qdrant Vector Store
+    client = QdrantClient(url=QDRANT_URL)
+    qdrant = QdrantVectorStore(client=client, collection_name=COLLECTION_NAME, embedding=embeddings)
+    
+    # Perform the Vector Search restricted to this specific file
+    search_results = qdrant.similarity_search(
+        query=query,
+        k=4, # Grab the 4 most relevant chunks
+        filter=models.Filter(
+            must=[models.FieldCondition(key="metadata.source", match=models.MatchValue(value=filename))]
+        )
+    )
+    
+    # Combine the retrieved chunks into a single context string
+    context_text = "\n\n".join([doc.page_content for doc in search_results])
+    
+    # Build a strict Q&A prompt to prevent hallucinations
+    prompt = f"""
+    You are a highly precise legal AI assistant. 
+    Answer the user's question using ONLY the following excerpts from their uploaded contract.
+    If the answer is not contained in the excerpts, simply say, "I cannot find the answer to this in the document."
+    Do not make up outside legal information or assume standard contract terms.
+    
+    Contract Excerpts:
+    {context_text}
+    
+    User Question: {query}
+    """
+    
+    # Call Gemini (Standard text generation, no Pydantic schema needed)
+    llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.2)
+    response = llm.invoke(prompt)
+    
+    answer = response.content
+
+    # If Gemini returns a list of blocks, extract the text from the first block
+    if isinstance(answer, list) and len(answer) > 0:
+        answer = answer[0].get("text", str(answer))
+        
+    return answer

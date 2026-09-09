@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.engine import analyze_contract_compliance, process_and_vectorize_file, delete_custom_document
+from app.engine import analyze_contract_compliance, process_and_vectorize_file, delete_custom_document, chat_with_document
 from app.database import save_analysis, get_all_history, delete_history_record
 from app.schemas import ContractAnalysisResponse
 
@@ -59,6 +59,29 @@ def analyze(request: AnalysisRequest):
         
         # Return the error cleanly so it doesn't just hang
         return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+class ChatRequest(BaseModel):
+    filename: str
+    query: str
+    model: str = "gemini-3.6-flash" # Use your default model here
+
+@app.post("/chat")
+def chat_document(request: ChatRequest):
+    try:
+        answer = chat_with_document(
+            filename=request.filename,
+            query=request.query,
+            model_name=request.model
+        )
+        return {"answer": answer}
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        print("\n=== CHAT CRASH ===")
+        print(error_msg)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
 
 from fastapi import File, UploadFile
 import tempfile
