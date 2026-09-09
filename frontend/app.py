@@ -35,6 +35,8 @@ if "total_cost" not in st.session_state:
     st.session_state.total_cost = 0.0
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "chat_citations" not in st.session_state:
+    st.session_state.chat_citations = []
 
 # 3. Environment & Directory Setup
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/analyze")
@@ -312,12 +314,14 @@ with tab_upload:
             else:
                 def reset_analysis_state():
                     st.session_state.custom_analysis = None
+                    st.session_state.chat_citations = [] # Wipes highlights when changing modes
                 
                 analysis_mode = st.radio(
                     "Analysis Mode:", 
                     ["Compliance Check", "General Abstraction", "Q&A Chat"], 
                     horizontal=True,
-                    on_change=reset_analysis_state
+                    on_change=reset_analysis_state,
+                    key="mode_toggle"
                 )
 
                 if analysis_mode != "Q&A Chat":
@@ -381,14 +385,20 @@ with tab_upload:
                                         "query": prompt,
                                         "model": selected_model
                                     }
-                                    res = requests.post(chat_url, json=payload, timeout=60)
+                                    res = requests.post(chat_url, json=payload, timeout=180)
                                     res.raise_for_status()
                                     
-                                    answer = res.json().get("answer", "No answer received.")
-                                    st.markdown(answer)
+                                    data = res.json()
+                                    answer = data.get("answer", "No answer received.")
+                                    quotes = data.get("exact_quotes", [])
                                     
                                     # Save to memory
                                     st.session_state.chat_history.append({"role": "assistant", "content": answer})
+                                    st.session_state.chat_citations = quotes
+
+                                    # Force a UI refresh so the left column immediately highlights the quotes
+                                    st.rerun()
+
                                 except Exception as e:
                                     st.error(f"Chat failed: {e}")
                 
@@ -488,35 +498,66 @@ with tab_upload:
                         st.rerun() # Go back to State 1
                 
                 st.divider()
+
+                st.subheader("Document Viewer")
                 
-                # Apply HTML Highlighting
-                display_text = st.session_state.custom_raw_text
-                if st.session_state.custom_analysis:
-                    display_text = highlight_text(
-                        display_text, 
-                        st.session_state.custom_analysis.get("flagged_clauses", [])
+                if st.session_state.custom_raw_text:
+                    import re
+                    display_text = st.session_state.custom_raw_text
+                    
+                    # Safely fetch the mode from global session state
+                    current_mode = st.session_state.get("mode_toggle", "Compliance Check")
+                    
+                    # --- Q&A Chat Highlighting ---
+                    if current_mode == "Q&A Chat":
+                        if st.session_state.get("chat_citations"):
+                            for quote in st.session_state.chat_citations:
+                                # Break the quote into individual words
+                                words = quote.strip().split()
+                                
+                                # Only highlight if it's a meaningful phrase (more than 3 words)
+                                if len(words) > 3: 
+                                    # 3. Create a flexible pattern that ignores spacing/newlines between words (\s+)
+                                    flexible_pattern = r'\s+'.join(re.escape(w) for w in words)
+                                    
+                                    html_tag = (
+                                        f'<mark style="background-color: #f3e8ff; color: #6b21a8; '
+                                        f'border: 1px solid #c084fc; font-weight: bold; padding: 2px 4px; '
+                                        rf'border-radius: 4px;" title="Source Citation">\g<0></mark>'
+                                    )
+                                    # Apply the flexible pattern
+                                    display_text = re.sub(f'({flexible_pattern})', html_tag, display_text, flags=re.IGNORECASE)
+                    
+                    # --- Compliance/Abstraction Highlighting ---
+                    elif st.session_state.get("custom_analysis"):
+                        display_text = highlight_text(
+                            display_text, 
+                            st.session_state.custom_analysis.get("flagged_clauses", [])
+                        )
+                    
+                    # ---  HTML AND CSS ---
+                    display_text_html = display_text.replace("\n", "<br>")
+                    
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background-color: #ffffff; 
+                            color: #1f2937; 
+                            padding: 24px; 
+                            border-radius: 6px; 
+                            border: 1px solid #d1d5db; 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                            font-size: 13.5px; 
+                            line-height: 1.7;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                        ">
+                            {display_text_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
                     )
-                
-                display_text_html = display_text.replace("\n", "<br>")
-                
-                st.markdown(
-                    f"""
-                    <div style="
-                        background-color: #ffffff; 
-                        color: #1f2937; 
-                        padding: 24px; 
-                        border-radius: 6px; 
-                        border: 1px solid #d1d5db; 
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-                        font-size: 13.5px; 
-                        line-height: 1.7;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-                    ">
-                        {display_text_html}
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                else:
+                    st.info("Upload a document to view it here.")
 
 
 # ------------------------------------------------------------------------------

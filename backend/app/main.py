@@ -69,12 +69,13 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_document(request: ChatRequest):
     try:
-        answer = chat_with_document(
+        # This returns {"answer": "...", "exact_quotes": ["..."]}
+        response_data = chat_with_document(
             filename=request.filename,
             query=request.query,
             model_name=request.model
         )
-        return {"answer": answer}
+        return response_data
     except Exception as e:
         import traceback
         error_msg = traceback.format_exc()

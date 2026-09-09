@@ -41,3 +41,7 @@ class ContractAnalysisResponse(BaseModel):
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     estimated_cost_usd: Optional[float] = None
+
+class ChatResponseSchema(BaseModel):
+    answer: str = Field(description="The conversational answer to the user's question.")
+    exact_quotes: list[str] = Field(description="1 to 3 exact, verbatim quotes from the context that support the answer. Must match the text character-by-character.")

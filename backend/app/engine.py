@@ -13,7 +13,7 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-from app.schemas import ContractAnalysisResponse
+from app.schemas import ContractAnalysisResponse, ChatResponseSchema
 from qdrant_client.http import models
 
 load_dotenv()
@@ -232,21 +232,22 @@ def chat_with_document(filename: str, query: str, model_name: str):
     Answer the user's question using ONLY the following excerpts from their uploaded contract.
     If the answer is not contained in the excerpts, simply say, "I cannot find the answer to this in the document."
     Do not make up outside legal information or assume standard contract terms.
+
+    Crucially, you must extract 1 to 3 EXACT, verbatim substrings from the text that prove your answer. 
+    These quotes must match the text character-by-character so they can be highlighted in the UI.
     
     Contract Excerpts:
     {context_text}
     
-    User Question: {query}
+    User Question: 
+    {query}
     """
     
     # Call Gemini (Standard text generation, no Pydantic schema needed)
     llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.2)
-    response = llm.invoke(prompt)
+    structured_llm = llm.with_structured_output(ChatResponseSchema)
     
-    answer = response.content
-
-    # If Gemini returns a list of blocks, extract the text from the first block
-    if isinstance(answer, list) and len(answer) > 0:
-        answer = answer[0].get("text", str(answer))
-        
-    return answer
+    result = structured_llm.invoke(prompt)
+    
+    # Return the dictionary directly {"answer": "...", "exact_quotes": ["..."]}
+    return result.model_dump()
