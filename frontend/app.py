@@ -6,6 +6,8 @@ import os
 import requests
 import streamlit as st
 import re
+from io import BytesIO
+from docx import Document
 
 # Page Configuration
 st.set_page_config(
@@ -109,6 +111,53 @@ def highlight_text(full_text, flagged_clauses):
     return highlighted
 
 
+def generate_word_report(analysis_data, document_name, mode="Compliance Check"):
+    """Generates a professional Word document from the AI analysis results in memory."""
+    doc = Document()
+    
+    # Title and Metadata
+    doc.add_heading('Legal Analysis Audit Report', 0)
+    doc.add_paragraph(f"Document Analyzed: {document_name}")
+    doc.add_paragraph(f"Analysis Mode: {mode}")
+    
+    # Executive Summary
+    doc.add_heading('Executive Summary', level=1)
+    doc.add_paragraph(analysis_data.get('summary', 'No summary provided.'))
+    
+    flagged = analysis_data.get("flagged_clauses", [])
+    
+    # Handle Compliance vs Abstraction
+    if not flagged and mode == "Compliance Check":
+         doc.add_paragraph("RESULT: Contract is fully compliant with the playbook. No high-risk clauses detected.")
+    else:
+        doc.add_heading('Detailed Findings', level=1)
+        for clause in flagged:
+            # Use different formatting based on risk level
+            risk = clause.get('risk_level', 'INFO')
+            
+            doc.add_heading(f"{clause.get('clause_title', 'Clause')}", level=2)
+            
+            # Add bold labels for the metadata
+            p_risk = doc.add_paragraph()
+            p_risk.add_run("Risk Level: ").bold = True
+            p_risk.add_run(risk)
+            
+            p_reason = doc.add_paragraph()
+            p_reason.add_run("Details/Reason: ").bold = True
+            p_reason.add_run(clause.get('reason', 'N/A'))
+            
+            if risk != "INFO":
+                p_redline = doc.add_paragraph()
+                p_redline.add_run("Proposed Redline:\n").bold = True
+                p_redline.add_run(clause.get('proposed_redline', 'N/A'))
+    
+    # Save to a byte stream (no files created on disk!)
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    
+    return buffer
+
 
 # ==============================================================================
 # MAIN WORKSPACE
@@ -169,7 +218,7 @@ with tab_demo:
                                 "playbook_rule": playbook_rule,
                                 "model": selected_model
                             }
-                            response = requests.post(BACKEND_URL, json=payload, timeout=60)
+                            response = requests.post(BACKEND_URL, json=payload, timeout=180)
                             response.raise_for_status()
                             
                             data = response.json()
@@ -259,10 +308,14 @@ with tab_upload:
             if not st.session_state.custom_raw_text:
                 st.info("Upload a document on the left to unlock analysis settings.")
             else:
+                def reset_analysis_state():
+                    st.session_state.custom_analysis = None
+                
                 analysis_mode = st.radio(
                     "Analysis Mode:", 
                     ["Compliance Check", "General Abstraction"], 
-                    horizontal=True
+                    horizontal=True,
+                    on_change=reset_analysis_state
                 )
                 
                 if analysis_mode == "Compliance Check":
@@ -290,7 +343,7 @@ with tab_upload:
                                 "model": selected_model,
                                 "mode": mode_param
                             }
-                            response = requests.post(BACKEND_URL, json=payload, timeout=60)
+                            response = requests.post(BACKEND_URL, json=payload, timeout=180)
                             response.raise_for_status()
                             data = response.json()
                             st.session_state.custom_analysis = data
@@ -336,11 +389,14 @@ with tab_upload:
                             report_text += f"ISSUE: {c.get('reason')}\nREDLINE: {c.get('proposed_redline')}\n"
                             report_text += "-"*30 + "\n"
                             
+                    # Generate the Word Document in memory
+                    docx_buffer = generate_word_report(result, st.session_state.custom_file_name, analysis_mode)
+                                        
                     st.download_button(
-                        label="Download Audit Report (.txt)",
-                        data=report_text,
-                        file_name=f"Audit_Report_{st.session_state.custom_file_name}.txt",
-                        mime="text/plain",
+                        label="Download Word Report (.docx)",
+                        data=docx_buffer,
+                        file_name=f"Audit_{st.session_state.custom_file_name}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True
                     )
 
@@ -487,24 +543,17 @@ with tab_history:
                 action_col1, action_col2, action_col3 = st.columns([3, 3, 4])
                 
                 with action_col1:
-                    # Generate the PDF/Text report dynamically for historical records
-                    report_text = f"LEGAL COMPLIANCE AUDIT\nDate: {record['timestamp']}\nDocument: {record['filename']}\nModel: {record['model_used']}\n"
-                    report_text += f"{'='*50}\n\nOVERALL SUMMARY:\n{record['summary']}\n\n{'='*50}\n\n"
+                    # Determine the mode historically based on if there's a rule
+                    hist_mode = "General Abstraction" if record['playbook_rule'] == "General Contract Abstraction" else "Compliance Check"
                     
-                    if not flagged:
-                        report_text += "RESULT: Contract is fully compliant.\n"
-                    else:
-                        report_text += f"VIOLATIONS FOUND ({len(flagged)}):\n\n"
-                        for c in flagged:
-                            report_text += f"CLAUSE: {c.get('clause_title')}\nRISK: {c.get('risk_level')}\n"
-                            report_text += f"ISSUE: {c.get('reason')}\nREDLINE: {c.get('proposed_redline')}\n"
-                            report_text += "-"*30 + "\n"
-                            
+                    # Generate the Word Document
+                    docx_buffer = generate_word_report(record, record['filename'], hist_mode)
+                    
                     st.download_button(
-                        label="Download Report",
-                        data=report_text,
-                        file_name=f"Audit_{record['filename']}_{record['timestamp'].replace(':', '-')}.txt",
-                        mime="text/plain",
+                        label="Download Word Report",
+                        data=docx_buffer,
+                        file_name=f"Audit_{record['filename']}_{record['timestamp'].replace(':', '-')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         key=f"dl_{record['id']}",
                         use_container_width=True
                     )
