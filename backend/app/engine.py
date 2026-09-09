@@ -31,7 +31,7 @@ def get_llm():
         max_retries=3
     )
 
-def analyze_contract_compliance(filename: str, full_contract_text: str, playbook_rule: str, model_name: str = "gemini-3.6-flash") -> ContractAnalysisResponse:
+def analyze_contract_compliance(filename: str, full_contract_text: str, playbook_rule: str, model_name: str = "gemini-3.6-flash", mode: str = "compliance") -> ContractAnalysisResponse:
     start_time = time.time()
     
     # Connect to Qdrant
@@ -45,26 +45,65 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
         f"data\\sample_contracts\\{filename}",     # Windows path
         f"../data/sample_contracts/{filename}"     # Relative path
     ]
+
+    if mode == "abstraction":
+            prompt = f"""
+            You are an expert corporate lawyer. Perform a "blind" abstraction on the following contract.
+            Extract the most critical terms: Core Obligations, Rights, Financials, and Termination Conditions.
+            
+            Set 'is_compliant' to true.
+            For the 'summary', provide a 2-3 sentence high-level overview of what this agreement actually is.
+            
+            For 'flagged_clauses', create one entry for each critical term you find:
+            - clause_title: The category (e.g., "Termination Rights", "Payment Terms", "Intellectual Property")
+            - risk_level: MUST be "INFO"
+            - reason: A plain-English explanation of what this specific term means for the parties.
+            - proposed_redline: "N/A"
+            - original_text: The exact verbatim substring from the contract that proves this.
+            
+            Contract Name: 
+            {filename}
     
-    # Retrieve top chunks ONLY from the selected contract
-    retriever = qdrant.as_retriever(
-        search_type="similarity_score_threshold",
-        search_kwargs={
-            "score_threshold": 0.65,
-            "k": 20,
-            "filter": models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="metadata.source",
-                        match=models.MatchAny(any=possible_sources) # Filters by the selected file
+            Contract Text:
+            {full_contract_text}
+            """
+    else:
+        # Retrieve top chunks ONLY from the selected contract
+            retriever = qdrant.as_retriever(
+                search_type="similarity_score_threshold",
+                search_kwargs={
+                    "score_threshold": 0.65,
+                    "k": 20,
+                    "filter": models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="metadata.source",
+                                match=models.MatchAny(any=possible_sources) # Filters by the selected file
+                            )
+                        ]
                     )
-                ]
+                }
             )
-        }
-    )
-    retrieved_docs = retriever.invoke(playbook_rule)
-    print(f"DEBUG: Qdrant returned {len(retrieved_docs)} chunks passing the threshold.")
-    context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+            retrieved_docs = retriever.invoke(playbook_rule)
+            print(f"DEBUG: Qdrant returned {len(retrieved_docs)} chunks passing the threshold.")
+            context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+    
+    
+            prompt = f"""
+            You are a Senior Legal Compliance Officer.
+            Evaluate the provided contract excerpts strictly against the Legal Playbook Rule.
+                    
+            LEGAL PLAYBOOK RULE:
+            {playbook_rule}
+                    
+            CONTRACT EXCERPTS:
+            {context_text}
+                    
+            INSTRUCTIONS:
+            - Identify any clauses that violate or deviate from the rule.
+            - When extracting 'original_text', copy the EXACT substring from the excerpts so it can be matched via substring search.
+            - Propose actionable, safer redline revisions.
+            """
 
     # Setup Gemini with Structured Output
     llm = ChatGoogleGenerativeAI(
@@ -73,27 +112,6 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
     structured_llm = llm.with_structured_output(ContractAnalysisResponse)
-
-    prompt_template = PromptTemplate(
-        input_variables=["rule", "context"],
-        template="""
-        You are a Senior Legal Compliance Officer.
-        Evaluate the provided contract excerpts strictly against the Legal Playbook Rule.
-        
-        LEGAL PLAYBOOK RULE:
-        {rule}
-        
-        CONTRACT EXCERPTS:
-        {context}
-        
-        INSTRUCTIONS:
-        - Identify any clauses that violate or deviate from the rule.
-        - When extracting 'original_text', copy the EXACT substring from the excerpts so it can be matched via substring search.
-        - Propose actionable, safer redline revisions.
-        """
-    )
-
-    prompt = prompt_template.format(rule=playbook_rule, context=context_text)
     
     # Invoke the model (Gemini only handles the legal stuff)
     result_pydantic: ContractAnalysisResponse = structured_llm.invoke(prompt)
@@ -126,6 +144,11 @@ import pypdf
 
 def process_and_vectorize_file(file_path: str, filename: str) -> str:
     """Extracts text from a file, chunks it, and saves it to Qdrant."""
+
+    try:
+        delete_custom_document(filename)
+    except Exception:
+        pass # If it fails (e.g., file doesn't exist yet), just move on
     
     # Extract Text based on file type
     text = ""

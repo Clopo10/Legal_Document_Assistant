@@ -81,9 +81,9 @@ def highlight_text(full_text, flagged_clauses):
             continue
             
         risk = clause.get("risk_level", "HIGH")
-        bg_color = "#fee2e2" if risk == "HIGH" else "#fef9c3"
-        text_color = "#991b1b" if risk == "HIGH" else "#854d0e"
-        border = "1px solid #f87171" if risk == "HIGH" else "1px solid #facc15"
+        bg_color = "#fee2e2" if risk == "HIGH" else ("#eff6ff" if risk == "INFO" else "#fef9c3")
+        text_color = "#991b1b" if risk == "HIGH" else ("#1e3a8a" if risk == "INFO" else "#854d0e")
+        border = "1px solid #f87171" if risk == "HIGH" else ("1px solid #60a5fa" if risk == "INFO" else "1px solid #facc15")
         reason_escaped = clause.get("reason", "").replace('"', '&quot;')
         
         # Clean the AI's string and escape special regex characters
@@ -96,7 +96,7 @@ def highlight_text(full_text, flagged_clauses):
         html_tag = (
             f'<mark style="background-color: {bg_color}; color: {text_color}; '
             f'border: {border}; font-weight: bold; padding: 2px 4px; '
-            f'border-radius: 4px;" title="{reason_escaped}">\g<0></mark>'
+            rf'border-radius: 4px;" title="{reason_escaped}">\g<0></mark>'
         )
         
         try:
@@ -259,23 +259,36 @@ with tab_upload:
             if not st.session_state.custom_raw_text:
                 st.info("Upload a document on the left to unlock analysis settings.")
             else:
-                playbook_rule = st.text_area(
-                    "Legal Playbook Rule:",
-                    value="The governing law must be the State of Delaware.",
-                    key="custom_rule",
-                    height=90
+                analysis_mode = st.radio(
+                    "Analysis Mode:", 
+                    ["Compliance Check", "General Abstraction"], 
+                    horizontal=True
                 )
                 
-                analyze_btn = st.button("Analyze Custom Document", type="primary", use_container_width=True)
+                if analysis_mode == "Compliance Check":
+                    playbook_rule = st.text_area(
+                        "Legal Playbook Rule:",
+                        value="The governing law must be the State of Delaware.",
+                        key="custom_rule",
+                        height=90
+                    )
+                    mode_param = "compliance"
+                else:
+                    st.info("The AI will extract core rights, obligations, financials, and termination terms without a specific rule.")
+                    playbook_rule = "General Contract Abstraction"
+                    mode_param = "abstraction"
+                
+                analyze_btn = st.button("Analyze Document", type="primary", use_container_width=True)
                 
                 if analyze_btn:
-                    with st.spinner("Analyzing against legal playbook..."):
+                    with st.spinner("Analyzing document..."):
                         try:
                             payload = {
                                 "filename": st.session_state.custom_file_name,
                                 "contract_text": st.session_state.custom_raw_text,
                                 "playbook_rule": playbook_rule,
-                                "model": selected_model
+                                "model": selected_model,
+                                "mode": mode_param
                             }
                             response = requests.post(BACKEND_URL, json=payload, timeout=60)
                             response.raise_for_status()
@@ -291,19 +304,23 @@ with tab_upload:
                 result = st.session_state.custom_analysis
                 if result:
                     st.divider()
-                    if result.get("is_compliant"):
-                        st.success("Contract is fully compliant with the playbook.")
+                    if analysis_mode == "Compliance Check":
+                        if result.get("is_compliant"):
+                            st.success("Contract is fully compliant with the playbook.")
+                        else:
+                            st.error("Non-Compliant Clauses Detected")
                     else:
-                        st.error("Non-Compliant Clauses Detected")
+                        st.success("General Abstraction Complete")
                         
                     st.info(f"**Summary:** {result.get('summary')}")
                     
                     flagged = result.get("flagged_clauses", [])
                     for clause in flagged:
-                        with st.expander(f"{clause.get('clause_title', 'Flagged Clause')}", expanded=True):
-                            st.markdown(f"**Risk Level:** `{clause.get('risk_level', 'HIGH')}`")
-                            st.markdown(f"**Reason:** {clause.get('reason', 'N/A')}")
-                            st.markdown(f"**Proposed Redline:**\n{clause.get('proposed_redline', 'N/A')}")
+                        with st.expander(f"{clause.get('clause_title', 'Clause')}", expanded=True):
+                            st.markdown(f"**Level:** `{clause.get('risk_level', 'HIGH')}`")
+                            st.markdown(f"**Details:** {clause.get('reason', 'N/A')}")
+                            if clause.get('risk_level') != "INFO":
+                                st.markdown(f"**Proposed Redline:**\n{clause.get('proposed_redline', 'N/A')}")
 
                     # --- EXPORT TO AUDIT REPORT ---
                     st.divider()
