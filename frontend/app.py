@@ -46,6 +46,11 @@ st.markdown(
             margin-top: -1.5rem !important;
             padding-top: 0 !important;
         }
+
+        /* Match Streamlit action buttons to the height of status banners. */
+        [data-testid="stButton"] button {
+            min-height: 58px !important;
+        }
     </style>
     """,
     unsafe_allow_html=True
