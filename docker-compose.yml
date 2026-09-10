@@ -21,6 +21,7 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       # Ensures your FastAPI print() statements show up instantly in the logs
       - PYTHONUNBUFFERED=1
+      - TZ=Europe/Bucharest
     depends_on:
       - qdrant
     volumes:
@@ -51,6 +52,7 @@ services:
       - BACKEND_URL=http://backend:8000/analyze
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - TZ=Europe/Bucharest
     depends_on:
       backend:
         condition: service_healthy
