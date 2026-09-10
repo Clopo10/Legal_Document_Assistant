@@ -50,20 +50,23 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
             prompt = f"""
             You are an expert corporate lawyer. Perform a "blind" abstraction on the following contract.
             Extract the most critical terms: Core Obligations, Rights, Financials, and Termination Conditions.
-            
+
+            CRITICAL INSTRUCTIONS:
+            Do not just state that a topic exists (e.g., NEVER write generic phrases like "Outlines core tenant duties"). You must extract the tangible, specific details: exact actions, rules, dollar amounts, deadlines, and strict conditions.
+
             Set 'is_compliant' to true.
             For the 'summary', provide a 2-3 sentence high-level overview of what this agreement actually is.
-            
+
             For 'flagged_clauses', create one entry for each critical term you find:
-            - clause_title: The category (e.g., "Termination Rights", "Payment Terms", "Intellectual Property")
+            - clause_title: The category (e.g., "Core Obligations", "Payment Terms", "Termination Rights")
             - risk_level: MUST be "INFO"
-            - reason: A plain-English explanation of what this specific term means for the parties.
+            - reason: A highly specific, plain-English explanation of the exact mechanics of this term. List the actual duties, numbers, and rules involved based on the text. Do not write a table-of-contents style overview.
             - proposed_redline: "N/A"
-            - original_text: The exact verbatim substring from the contract that proves this.
-            
+            - original_text: The FULL, exact verbatim paragraph or complete sentences from the contract that contain these details. Do not summarize, alter, or truncate this text.
+
             Contract Name: 
             {filename}
-    
+
             Contract Text:
             {full_contract_text}
             """
