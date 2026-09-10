@@ -16,10 +16,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS ---
+# --- CUSTOM CSS: Toolbar ---
 st.markdown(
     """
     <style>
+        [data-testid="stHeadingWithActionElements"] h1 {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        /* Force the actual content inside the tab to push itself down */
+        div[role="tabpanel"] {
+            padding-top: 1.5rem !important;
+            margin-top: 1rem !important;
+        }
+
         /* Hide the Deploy button */
         [data-testid="stAppDeployButton"] {
             display: none !important;
@@ -29,11 +40,11 @@ st.markdown(
         [data-testid="stStatusWidget"] {
             display: none !important;
         }
-
-        /* Reduce the massive default top padding so the app sits flush */
-        .block-container {
-            padding-top: 2rem !important;
-            padding-bottom: 2rem !important;
+        
+        /* Kill the invisible padding above the main Title / Logo */
+        [data-testid="stHeadingWithActionElements"] {
+            margin-top: -1.5rem !important;
+            padding-top: 0 !important;
         }
     </style>
     """,
@@ -379,7 +390,7 @@ with tab_demo:
         st.subheader("Rule Configuration")
         
         # Native Streamlit container to prevent page scrolling
-        with st.container(height=600):
+        with st.container(height=640):
             selected_file = st.selectbox(
                 "Select a Contract:",
                 options=available_contracts if available_contracts else ["No contracts found"],
@@ -452,7 +463,7 @@ with tab_demo:
     with col1:
         st.subheader("Document Viewer")
         
-        with st.container(height=600):
+        with st.container(height=640):
             if raw_text:
                 display_text = raw_text
                 if st.session_state.analysis_result:
