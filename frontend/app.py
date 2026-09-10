@@ -12,6 +12,7 @@ from docx import Document
 # Page Configuration
 st.set_page_config(
     page_title="Legal AI Assistant",
+    page_icon="assets/logo.svg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
