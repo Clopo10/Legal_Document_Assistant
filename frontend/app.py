@@ -689,7 +689,6 @@ with tab_upload:
         with st.container(height=640):
             # STATE 1: Empty - Show Drag and Drop
             if not st.session_state.custom_raw_text:
-                st.write("Upload a `.txt` or text-based `.pdf` contract. The backend will instantly extract, chunk, and vectorize it.")
                 uploaded_file = st.file_uploader(
                     "Drop contract here",
                     type=["txt", "pdf"],
@@ -713,6 +712,8 @@ with tab_upload:
                             st.rerun() # Force UI to update immediately
                         except Exception as e:
                             st.error(f"Upload failed: {e}")
+                else:
+                    st.write("Upload a `.txt` or text-based `.pdf` contract. The backend will instantly extract, chunk, and vectorize it.")
                             
             # STATE 2: Uploaded - Show Document Viewer
             else:
