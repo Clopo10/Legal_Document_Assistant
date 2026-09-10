@@ -1,0 +1,38 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+/venv/
+
+# Secrets & Environment Configurations
+.env
+.env.*
+*.env
+
+# Python Caches & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Data & User Uploads
+data/
+uploads/
+/data/
+
+# Local Databases (Mount via Docker volumes instead)
+*.db
+*.sqlite3
+backend/history.db
+/backend/history.db
+
+# Git & System Artifacts
+.git/
+.gitignore
+
+# Other
+evaluation/
+scripts/
+.vscode/
+*.log
+*.pem
+*.key

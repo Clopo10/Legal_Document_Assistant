@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -11,31 +9,51 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: legal_backend
     ports:
       - "8000:8000"
     environment:
-      # Points to the Qdrant container on the internal Docker network
       - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:?GOOGLE_API_KEY is required; set it in .env or the shell}
+      # Prevents the __pycache__ OS mismatch bug during bind mounts
+      - PYTHONDONTWRITEBYTECODE=1
+      # Ensures your FastAPI print() statements show up instantly in the logs
+      - PYTHONUNBUFFERED=1
     depends_on:
       - qdrant
     volumes:
       # Mounts local code so you don't have to rebuild the image on every change
       - ./backend:/app
       - ./data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: legal_frontend
     ports:
       - "8501:8501"
     environment:
-      # Points to the FastAPI container
-      - BACKEND_URL=http://backend:8000
+      - BACKEND_URL=http://backend:8000/analyze
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
+      - ./data:/data
