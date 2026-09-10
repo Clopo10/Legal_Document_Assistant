@@ -247,6 +247,8 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "chat_citations" not in st.session_state:
     st.session_state.chat_citations = []
+if "workspace_uploader_version" not in st.session_state:
+    st.session_state.workspace_uploader_version = 0
 
 # 3. Environment & Directory Setup
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/analyze")
@@ -512,6 +514,27 @@ with tab_upload:
     if "custom_analysis" not in st.session_state:
         st.session_state.custom_analysis = None
 
+    def clear_workspace():
+        try:
+            cleanup_url = BACKEND_URL.replace("/analyze", "/cleanup")
+            payload = {"filename": st.session_state.custom_file_name}
+            cleanup_response = requests.post(
+                cleanup_url,
+                json=payload,
+                timeout=10
+            )
+            cleanup_response.raise_for_status()
+        except Exception as e:
+            st.error(f"Workspace cleanup failed: {e}")
+            return
+
+        st.session_state.custom_file_name = None
+        st.session_state.custom_raw_text = None
+        st.session_state.custom_analysis = None
+        st.session_state.chat_history = []
+        st.session_state.chat_citations = []
+        st.session_state.workspace_uploader_version += 1
+
     col1, col2 = st.columns([6, 4])
     
     # ---------------- RIGHT COLUMN: RULES & EXPORT ----------------
@@ -667,7 +690,11 @@ with tab_upload:
             # STATE 1: Empty - Show Drag and Drop
             if not st.session_state.custom_raw_text:
                 st.write("Upload a `.txt` or text-based `.pdf` contract. The backend will instantly extract, chunk, and vectorize it.")
-                uploaded_file = st.file_uploader("Drop contract here", type=["txt", "pdf"])
+                uploaded_file = st.file_uploader(
+                    "Drop contract here",
+                    type=["txt", "pdf"],
+                    key=f"workspace_uploader_{st.session_state.workspace_uploader_version}"
+                )
                 
                 if uploaded_file:
                     with st.spinner(f"Extracting and Vectorizing `{uploaded_file.name}`..."):
@@ -693,19 +720,11 @@ with tab_upload:
                 with top_col1:
                     st.success(f"Active: `{st.session_state.custom_file_name}`")
                 with top_col2:
-                    if st.button("Clear Workspace", use_container_width=True):
-                        try:
-                            cleanup_url = BACKEND_URL.replace("/analyze", "/cleanup")
-                            payload = {"filename": st.session_state.custom_file_name}
-                            requests.post(cleanup_url, json=payload, timeout=10)
-                        except Exception as e:
-                            st.warning(f"Frontend cleared, but backend cleanup failed: {e}")
-
-                        st.session_state.custom_file_name = None
-                        st.session_state.custom_raw_text = None
-                        st.session_state.custom_analysis = None
-                        st.session_state.chat_history = []
-                        st.rerun() # Go back to State 1
+                    st.button(
+                        "Clear Workspace",
+                        use_container_width=True,
+                        on_click=clear_workspace
+                    )
                 
                 st.divider()
 
