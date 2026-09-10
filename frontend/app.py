@@ -20,20 +20,132 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        /* 1. Hide the Deploy button */
+        /* Hide the Deploy button */
         [data-testid="stAppDeployButton"] {
             display: none !important;
         }
 
-        /* 2. Hide the Running Man (Status Widget) */
+        /* Hide the Running Man (Status Widget) */
         [data-testid="stStatusWidget"] {
             display: none !important;
         }
 
-        /* 3. Reduce the massive default top padding so the app sits flush */
+        /* Reduce the massive default top padding so the app sits flush */
         .block-container {
             padding-top: 2rem !important;
             padding-bottom: 2rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- CUSTOM CSS: DROPBOX UPLOADER ---
+st.markdown(
+    """
+    <style>
+        /* The Main Outer Box */
+        [data-testid="stFileUploaderDropzone"] {
+            width: 100% !important;
+            min-height: 520px !important; 
+            border-radius: 24px !important;
+            background-color: rgba(0, 97, 255, 0.04) !important;
+            border: 2px dashed rgba(0, 97, 255, 0.4) !important;
+            position: relative !important; 
+            overflow: hidden !important; /* Keeps everything cleanly inside */
+            transition: all 0.3s ease-in-out !important;
+        }
+        
+        [data-testid="stFileUploaderDropzone"]:hover {
+            background-color: rgba(0, 97, 255, 0.08) !important;
+            border: 2px solid #0061FF !important;
+        }
+
+        /* Pin Logo dead center using the pseudo-element */
+        [data-testid="stFileUploaderDropzone"]::before {
+            content: "";
+            position: absolute !important;
+            top: 40% !important; 
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important; 
+            
+            width: 150px;  
+            height: 150px;
+            background-image: url("https://upload.wikimedia.org/wikipedia/commons/7/78/Dropbox_Icon.svg");
+            background-size: contain;
+            background-repeat: no-repeat;
+            pointer-events: none; /* Allows dragging files right over the logo */
+            z-index: 1 !important;
+        }
+
+        /* Hide default Streamlit cloud icon and "Drag and drop" text */
+        [data-testid="stFileUploaderDropzone"] svg { display: none !important; }
+        [data-testid="stFileUploaderDropzone"] > div > span { display: none !important; }
+
+        /* Keep the controls together at the bottom of the dropzone */
+        [data-testid="stFileUploaderDropzone"] {
+            display: block !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"] > div {
+            position: static !important;
+            width: auto !important;
+            height: auto !important;
+            display: block !important;
+            padding: 0 !important;
+            z-index: 5 !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"] > [data-testid="stFileUploaderDropzoneInstructions"] {
+            position: absolute !important;
+            right: 0 !important;
+            bottom: 30px !important;
+            left: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+        
+        /* Clean up the Button */
+        [data-testid="stFileUploaderDropzone"] button {
+            position: absolute !important;
+            bottom: 62px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            z-index: 6 !important;
+            background-color: #0061FF !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0.8rem 2rem !important;
+            font-weight: 600 !important;
+            font-size: 18px !important;
+            margin: 0 !important;
+            margin-bottom: 12px !important; /* Space between button and 200mb text */
+        }
+        
+        [data-testid="stFileUploaderDropzone"] button:hover {
+            background-color: #0050d1 !important;
+        }
+
+        /* Clean up the 200MB text */
+        [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderDropzoneInstructions"] span {
+            display: block !important;
+            position: static !important;
+            width: auto !important;
+            max-width: 100% !important;
+            font-size: 15px !important; 
+            color: #6b7280 !important;  
+            margin: 0 !important;
+            text-align: center !important;
+        }
+
+        /* Drop contract here label */
+        [data-testid="stFileUploader"] label p {
+            font-size: 18px !important;
+            font-weight: 600 !important;
+            margin-bottom: 12px !important;
         }
     </style>
     """,
