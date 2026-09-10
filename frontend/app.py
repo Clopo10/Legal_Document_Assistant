@@ -61,6 +61,64 @@ st.markdown(
             border: 2px solid #0061FF !important;
         }
 
+        /* Switch to a centered file preview after an upload. */
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"])::before,
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stFileUploaderDropzoneInstructions"],
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stBaseButton-borderlessIcon"] {
+            display: none !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) > div {
+            position: relative !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"] [data-testid="stFileChips"] {
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            margin: 0 !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stFileChip"] > div:first-child {
+            width: 32px !important;
+            height: 32px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stFileChip"] > div:first-child svg {
+            display: none !important;
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stFileChip"] > div:first-child::after {
+            content: "";
+            width: 22px;
+            height: 22px;
+            border: 3px solid rgba(0, 97, 255, 0.2);
+            border-top-color: #0061FF;
+            border-radius: 50%;
+            animation: legalUploaderSpin 0.8s linear infinite;
+        }
+
+        @keyframes legalUploaderSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        [data-testid="stFileUploaderDropzone"]:has([data-testid="stFileChips"]) [data-testid="stFileChip"] svg {
+            display: block !important;
+        }
+
         /* Pin Logo dead center using the pseudo-element */
         [data-testid="stFileUploaderDropzone"]::before {
             content: "";
@@ -108,7 +166,7 @@ st.markdown(
         }
         
         /* Clean up the Button */
-        [data-testid="stFileUploaderDropzone"] button {
+        [data-testid="stFileUploaderDropzone"]:not(:has([data-testid="stFileChips"])) button {
             position: absolute !important;
             bottom: 62px !important;
             left: 50% !important;
@@ -125,7 +183,7 @@ st.markdown(
             margin-bottom: 12px !important; /* Space between button and 200mb text */
         }
         
-        [data-testid="stFileUploaderDropzone"] button:hover {
+        [data-testid="stFileUploaderDropzone"]:not(:has([data-testid="stFileChips"])) button:hover {
             background-color: #0050d1 !important;
         }
 
