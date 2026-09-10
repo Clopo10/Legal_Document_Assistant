@@ -95,18 +95,20 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
     
             prompt = f"""
             You are a Senior Legal Compliance Officer.
-            Evaluate the provided contract excerpts strictly against the Legal Playbook Rule.
-                    
-            LEGAL PLAYBOOK RULE:
+            Evaluate the provided contract excerpts strictly against the Legal Playbook Rules.
+
+            LEGAL PLAYBOOK RULES:
             {playbook_rule}
-                    
+
             CONTRACT EXCERPTS:
             {context_text}
-                    
-            INSTRUCTIONS:
-            - Identify any clauses that violate or deviate from the rule.
-            - When extracting 'original_text', copy the EXACT substring from the excerpts so it can be matched via substring search.
-            - Propose actionable, safer redline revisions.
+
+            CRITICAL INSTRUCTIONS:
+            1. EXHAUSTIVE CHECK: You must evaluate the contract against EVERY SINGLE RULE listed in the Playbook Rules above. Treat the playbook as a strict, mandatory checklist. 
+            2. NO EARLY EXIT: Do not stop after finding just one violation. If I provide 3 rules, you must check the document against all 3. 
+            3. MULTIPLE ENTRIES: Create a separate flagged entry for EACH distinct rule violation you find. If a single clause violates multiple rules, flag it multiple times.
+            4. EXACT QUOTES: When extracting 'original_text', copy the EXACT, character-for-character substring from the excerpts. Do not fix typos or change spacing. Our frontend uses strict substring matching, so altering even a single space will break the UI highlighting.
+            5. REDLINES: For every violation, propose an actionable, safer 'proposed_redline' that brings the text into compliance.
             """
 
     # Setup Gemini with Structured Output

@@ -52,6 +52,19 @@ st.markdown(
         [data-testid="stButton"] button {
             min-height: 58px !important;
         }
+
+        /* Keep playbook rules visible while results expand inside fixed panels. */
+        [data-testid="stTextArea"] {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 2 !important;
+            background: var(--background-color) !important;
+            padding-top: 0.25rem !important;
+        }
+
+        [data-testid="stElementContainer"]:has([data-testid="stTextArea"]) {
+            overflow: visible !important;
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -265,7 +278,7 @@ with st.sidebar:
     st.subheader("AI Engine")
     selected_model = st.selectbox(
         "Model Tier",
-        options=["gemini-3.6-flash", "gemini-3.8-flash"]
+        options=["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite"]
     )
     
     st.divider()
@@ -407,7 +420,7 @@ with tab_demo:
             
             playbook_rule = st.text_area(
                 "Legal Playbook Rule:",
-                value="The governing law of the contract must be the State of Delaware.",
+                value="1. The governing law of the contract must be the State of Delaware.",
                 key="demo_rule",
                 height=100
             )
@@ -562,7 +575,7 @@ with tab_upload:
                     if analysis_mode == "Compliance Check":
                         playbook_rule = st.text_area(
                             "Legal Playbook Rule:",
-                            value="The governing law must be the State of Delaware.",
+                            value="1. The governing law must be the State of Delaware.",
                             key="custom_rule",
                             height=90
                         )
