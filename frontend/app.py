@@ -49,7 +49,8 @@ st.markdown(
         }
 
         /* Match Streamlit action buttons to the height of status banners. */
-        [data-testid="stButton"] button {
+        [data-testid="stButton"] button,
+        [data-testid="stDownloadButton"] button {
             min-height: 58px !important;
         }
 
