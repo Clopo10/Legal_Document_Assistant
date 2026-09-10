@@ -3,5 +3,3 @@
 frontend: streamlit run app.py
 
 backend: uvicorn app.main:app --reload --port 8000
-
-fix Q&A cost

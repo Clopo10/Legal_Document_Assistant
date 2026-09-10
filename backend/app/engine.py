@@ -21,6 +21,16 @@ load_dotenv()
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 COLLECTION_NAME = "legal_contracts"
 
+MODEL_INPUT_PRICES = {
+    "gemini-3.8-flash": 0.15,
+    "gemini-3.6-flash": 0.075,
+    "gemini-3.5-flash-lite": 0.0375,
+}
+
+
+def get_input_price_per_million(model_name: str) -> float:
+    return MODEL_INPUT_PRICES.get(model_name.lower(), MODEL_INPUT_PRICES["gemini-3.6-flash"])
+
 # Embedding model loaded in memory
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -134,11 +144,7 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
     final_response["input_tokens"] = est_input_tokens
     
     # Dynamic Pricing Calculator
-    if "3.8" in model_name.lower():
-        price_per_million = 0.15  # 3.8 Flash pricing
-    else:
-        price_per_million = 0.075 # 3.6 Flash pricing
-        
+    price_per_million = get_input_price_per_million(model_name)
     final_response["estimated_cost_usd"] = round((est_input_tokens / 1_000_000) * price_per_million, 6)
 
     # Return the dictionary to FastAPI (FastAPI automatically converts dicts to JSON)
@@ -256,4 +262,15 @@ def chat_with_document(filename: str, query: str, model_name: str):
     result = structured_llm.invoke(prompt)
     
     # Return the dictionary directly {"answer": "...", "exact_quotes": ["..."]}
-    return result.model_dump()
+    response = result.model_dump()
+    est_input_tokens = len(prompt) // 4
+    response["input_tokens"] = est_input_tokens
+
+    price_per_million = get_input_price_per_million(model_name)
+
+    response["estimated_cost_usd"] = round(
+        (est_input_tokens / 1_000_000) * price_per_million,
+        6
+    )
+
+    return response

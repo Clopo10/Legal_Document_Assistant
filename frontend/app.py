@@ -642,6 +642,8 @@ with tab_upload:
                                     # Save to memory
                                     st.session_state.chat_history.append({"role": "assistant", "content": answer})
                                     st.session_state.chat_citations = quotes
+                                    st.session_state.total_tokens += data.get("input_tokens", 0) or 0
+                                    st.session_state.total_cost += data.get("estimated_cost_usd", 0.0) or 0.0
 
                                     # Force a UI refresh so the left column immediately highlights the quotes
                                     st.rerun()
