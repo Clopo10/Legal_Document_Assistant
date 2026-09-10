@@ -16,6 +16,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- CUSTOM CSS ---
+st.markdown(
+    """
+    <style>
+        /* 1. Hide the Deploy button */
+        [data-testid="stAppDeployButton"] {
+            display: none !important;
+        }
+
+        /* 2. Hide the Running Man (Status Widget) */
+        [data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
+        /* 3. Reduce the massive default top padding so the app sits flush */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Remove Streamlit's default massive top padding safely
 st.markdown("""
     <style>
