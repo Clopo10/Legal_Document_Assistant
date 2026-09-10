@@ -53,16 +53,17 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
 
             CRITICAL INSTRUCTIONS:
             Do not just state that a topic exists (e.g., NEVER write generic phrases like "Outlines core tenant duties"). You must extract the tangible, specific details: exact actions, rules, dollar amounts, deadlines, and strict conditions.
+            ALWAYS identify and cite the specific section number or heading for each term you extract.
 
             Set 'is_compliant' to true.
             For the 'summary', provide a 2-3 sentence high-level overview of what this agreement actually is.
 
             For 'flagged_clauses', create one entry for each critical term you find:
-            - clause_title: The category (e.g., "Core Obligations", "Payment Terms", "Termination Rights")
+            - clause_title: The category AND the specific section number/title from the contract (e.g., "Payment Terms (Section 4.1)", "Core Obligations (Article II)", or "Termination Rights (Section 9.b)")
             - risk_level: MUST be "INFO"
             - reason: A highly specific, plain-English explanation of the exact mechanics of this term. List the actual duties, numbers, and rules involved based on the text. Do not write a table-of-contents style overview.
             - proposed_redline: "N/A"
-            - original_text: The FULL, exact verbatim paragraph or complete sentences from the contract that contain these details. Do not summarize, alter, or truncate this text.
+            - original_text: The EXACT, character-for-character substring from the contract. You must act like a simple copy-paste tool. Do not fix typos, do not remove or add spaces, do not change line breaks, and do not use ellipses (...). Our frontend uses a strict programming substring search to highlight this text, so if you alter even a single character or space, the UI highlighting will break!
 
             Contract Name: 
             {filename}
