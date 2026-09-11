@@ -396,13 +396,13 @@ def generate_word_report(analysis_data, document_name, mode="Compliance Check"):
 st.title("Interactive Legal Document Assistant")
 
 tab_demo, tab_upload, tab_history = st.tabs([
-    "Demo Gallery", 
-    "Custom Workspace", 
+    "Demo", 
+    "Workspace", 
     "History"
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: DEMO GALLERY
+# TAB 1: DEMO
 # ------------------------------------------------------------------------------
 with tab_demo:
     available_contracts = get_contract_files()
@@ -518,10 +518,10 @@ with tab_demo:
                 st.info("Select a contract from the panel on the right to preview it.")
 
 # ------------------------------------------------------------------------------
-# TAB 2: CUSTOM WORKSPACE
+# TAB 2: WORKSPACE
 # ------------------------------------------------------------------------------
 with tab_upload:
-    # State Management for the Custom Workspace
+    # State Management for the Workspace
     if "custom_file_name" not in st.session_state:
         st.session_state.custom_file_name = None
     if "custom_raw_text" not in st.session_state:
@@ -832,7 +832,7 @@ with tab_history:
 
     # Render KPIs
     if not history_data:
-        st.info("No analysis history found. Run an analysis in the Demo or Custom workspace to see it here.")
+        st.info("No analysis history found. Run an analysis in the Demo or Workspace to see it here.")
     else:
         total_runs = len(history_data)
         total_spend = sum(item.get("estimated_cost_usd", 0.0) for item in history_data)
