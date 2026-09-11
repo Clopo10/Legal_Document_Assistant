@@ -56,7 +56,7 @@ def analyze_contract_compliance(filename: str, full_contract_text: str, playbook
         f"../data/sample_contracts/{filename}"     # Relative path
     ]
 
-    if mode == "abstraction":
+    if mode == "summary":
             prompt = f"""
             You are an expert corporate lawyer. Perform a "blind" abstraction on the following contract.
             Extract the most critical terms: Core Obligations, Rights, Financials, and Termination Conditions.

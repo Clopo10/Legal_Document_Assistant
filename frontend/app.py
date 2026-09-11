@@ -357,7 +357,7 @@ def generate_word_report(analysis_data, document_name, mode="Compliance Check"):
     
     flagged = analysis_data.get("flagged_clauses", [])
     
-    # Handle Compliance vs Abstraction
+    # Handle Compliance vs Summary
     if not flagged and mode == "Compliance Check":
          doc.add_paragraph("RESULT: Contract is fully compliant with the playbook. No high-risk clauses detected.")
     else:
@@ -566,7 +566,7 @@ with tab_upload:
                 
                 analysis_mode = st.radio(
                     "Analysis Mode:", 
-                    ["Compliance Check", "General Abstraction", "Q&A Chat"], 
+                    ["Compliance Check", "Summary", "Q&A Chat"], 
                     horizontal=True,
                     on_change=reset_analysis_state,
                     key="mode_toggle"
@@ -584,7 +584,7 @@ with tab_upload:
                     else:
                         st.info("The AI will extract core rights, obligations, financials, and termination terms without a specific rule.")
                         playbook_rule = "General Contract Abstraction"
-                        mode_param = "abstraction"
+                        mode_param = "summary"
                     
                     analyze_btn = st.button("Analyze Document", type="primary", use_container_width=True)
                     
@@ -662,7 +662,7 @@ with tab_upload:
                         else:
                             st.error("Non-Compliant Clauses Detected")
                     else:
-                        st.success("General Abstraction Complete")
+                        st.success("Summary Complete")
                         
                     st.info(f"**Summary:** {result.get('summary')}")
                     
@@ -775,7 +775,7 @@ with tab_upload:
                                     # Apply the flexible pattern
                                     display_text = re.sub(f'({flexible_pattern})', html_tag, display_text, flags=re.IGNORECASE)
                     
-                    # --- Compliance/Abstraction Highlighting ---
+                    # --- Compliance/Summary Highlighting ---
                     elif st.session_state.get("custom_analysis"):
                         display_text = highlight_text(
                             display_text, 
@@ -872,7 +872,7 @@ with tab_history:
                 
                 with action_col1:
                     # Determine the mode historically based on if there's a rule
-                    hist_mode = "General Abstraction" if record['playbook_rule'] == "General Contract Abstraction" else "Compliance Check"
+                    hist_mode = "Summary" if record['playbook_rule'] == "General Contract Abstraction" else "Compliance Check"
                     
                     # Generate the Word Document
                     docx_buffer = generate_word_report(record, record['filename'], hist_mode)

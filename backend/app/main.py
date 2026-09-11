@@ -23,7 +23,7 @@ class AnalysisRequest(BaseModel):
     contract_text: str
     playbook_rule: str
     model: str = "gemini-3.6-flash"
-    mode: str = "compliance"  # or "abstraction"
+    mode: str = "compliance"  # or "summary"
 
 @app.get("/")
 def health_check():
