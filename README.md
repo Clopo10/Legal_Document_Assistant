@@ -39,14 +39,6 @@ Stop the services with:
 docker compose down
 ```
 
-## Optional: index sample contracts
-
-With Qdrant running, execute the ingestion script from the project root:
-
-```bash
-python scripts/ingest_contracts.py
-```
-
 It reads `.txt` files from `data/sample_contracts` and stores their embeddings in the local Qdrant collection.
 
 ## Project Layout
